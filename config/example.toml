@@ -5,10 +5,10 @@ width = 1024
 height = 720
 dpi = 240
 layout = "layout.json"
-heroes = "../sunflower/statics/heroes.json"
+heroes = "../companion/data/s18-18.3.json"
 logs = "../runs"
 
-# Upstream data is from 2024. Keep false until replaced and checked against your game.
+# S18/18.3 reference is imported, but keep false until checked against your game.
 current_data_verified = false
 targets = []
 reserve_gold = 20

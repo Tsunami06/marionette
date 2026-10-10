@@ -11,7 +11,7 @@ class Settings:
     height: int = 720
     dpi: int = 240
     layout: Path = Path("config/layout.json")
-    heroes: Path = Path("sunflower/statics/heroes.json")
+    heroes: Path = Path(__file__).parent / "data/s18-18.3.json"
     current_data_verified: bool = False
     targets: tuple[str, ...] = ()
     reserve_gold: int = 20
