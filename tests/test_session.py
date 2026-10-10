@@ -70,6 +70,28 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await session.buy(0, execute=True)).reason, "season_data_not_verified")
         self.assertEqual(session.device.clicks, [])
 
+    async def test_charms_and_ambiguous_champions_never_receive_input(self):
+        for card, reason in ((Card("余震", 2, kind="charm"), "unsupported_shop_type"),
+                             (Card("拉克丝", 5, identity_status="ambiguous"),
+                              "ambiguous_champion_identity")):
+            session = self.session([snapshot(store=(card,) + (None,) * 4)])
+            result = await session.buy(0, execute=True)
+            self.assertEqual(result.reason, reason)
+            self.assertEqual(session.device.clicks, [])
+
+    async def test_same_name_different_form_blocks_stale_plan(self):
+        card = Card("拉克丝", 5, entity_id="new-form")
+        session = self.session([snapshot(store=(card,) + (None,) * 4)])
+        result = await session.buy(0, execute=True, expected_name="拉克丝", expected_id="old-form")
+        self.assertEqual(result.reason, "shop_identity_changed")
+        self.assertEqual(session.device.clicks, [])
+
+    async def test_target_name_matching_a_charm_does_not_buy_it(self):
+        card = Card("余震", 2, kind="charm")
+        session = self.session([snapshot(store=(card,) + (None,) * 4)], targets=("余震",))
+        self.assertEqual(await session.run(execute=True, limit=1), "limit_reached")
+        self.assertEqual(session.device.clicks, [])
+
     async def test_gold_reserve_and_changed_shop_block(self):
         session = self.session([snapshot(coin=21)])
         self.assertEqual((await session.buy(0, execute=True)).reason, "gold_reserve")

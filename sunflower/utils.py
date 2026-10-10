@@ -167,6 +167,8 @@ class SunflowerUtils:
         get the chess star from the image
         """
         template = cv2.imread(os.path.join(IMAGE_PATH, 'chess_star.jpg'), cv2.IMREAD_GRAYSCALE)
+        if image is not None and image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         return await SunflowerUtils.count_template_matches(template, image, threshold)
 
 

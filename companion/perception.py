@@ -3,6 +3,8 @@ from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 import re
 
+from companion.catalog import Catalog
+
 
 def match_name(text: str, names, threshold: float = 0.86, margin: float = 0.15):
     text = re.sub(r"\s+", "", text)
@@ -34,6 +36,12 @@ class TextBox:
 class Card:
     name: str
     price: int | None
+    kind: str = "champion"
+    entity_id: str | None = None
+    candidate_ids: tuple[str, ...] = ()
+    trait_ids: tuple[str, ...] = ()
+    identity_status: str = "resolved"
+    price_source: str = "catalog_reference"
 
 
 @dataclass(frozen=True)
@@ -47,6 +55,7 @@ class Snapshot:
     store: tuple[Card | None, ...]
     errors: tuple[str, ...] = ()
     store_text: tuple[str, ...] = ()
+    store_details_text: tuple[str, ...] = ()
 
     def json(self):
         return asdict(self)
@@ -86,6 +95,7 @@ def phase_of(boxes):
 
 
 def parse_frame(boxes, layout, heroes, frame_id, captured_at):
+    catalog = heroes if isinstance(heroes, Catalog) else Catalog.from_prices(heroes)
     coin = integer(text_in(boxes, layout["coin"]), 0, 999)
     level = integer(text_in(boxes, layout["level"]), 1, 20, "级")
     period_text = text_in(boxes, layout["period"])
@@ -93,12 +103,31 @@ def parse_frame(boxes, layout, heroes, frame_id, captured_at):
     period = (int(match[1]), int(match[2])) if match else None
     cards = []
     store_text = []
-    for area in layout["store"]:
+    store_details_text = []
+    details_areas = layout.get("store_details", [None] * len(layout["store"]))
+    for slot, area in enumerate(layout["store"]):
         raw_text = text_in(boxes, area)
         store_text.append(raw_text)
-        name = match_name(raw_text, heroes)
-        cards.append(Card(name, heroes[name]) if name else None)
+        details = text_in(boxes, details_areas[slot]) if details_areas[slot] else ""
+        store_details_text.append(details)
+        charm = catalog.charms_by_name.get(re.sub(r"\s+", "", raw_text))
+        if charm:
+            # The reference cost may vary with upgrades; charm purchasing is not enabled.
+            cards.append(Card(charm["name"], charm.get("cost"), "charm", str(charm["id"])))
+            continue
+        name = match_name(raw_text, catalog.by_name)
+        if not name:
+            cards.append(None)
+            continue
+        candidates = catalog.resolve(name, details)
+        resolved = len(candidates) == 1
+        prices = {row.cost for row in candidates}
+        cards.append(Card(name, next(iter(prices)) if len(prices) == 1 else None,
+                          entity_id=candidates[0].id if resolved else None,
+                          candidate_ids=tuple(row.id for row in candidates),
+                          trait_ids=candidates[0].trait_ids if resolved else (),
+                          identity_status="resolved" if resolved else "ambiguous"))
     errors = tuple(key for key, value in (("coin", coin), ("level", level), ("period", period))
                    if value is None)
     return Snapshot(frame_id, captured_at, phase_of(boxes), coin, level, period,
-                    tuple(cards), errors, tuple(store_text))
+                    tuple(cards), errors, tuple(store_text), tuple(store_details_text))

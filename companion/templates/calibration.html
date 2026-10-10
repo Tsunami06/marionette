@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>金铲铲截图坐标校准</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0f172a;color:#e2e8f0;font:15px system-ui,sans-serif}
+main{max-width:1400px;margin:auto;padding:24px}h1{font-size:24px;margin:0 0 10px}p{line-height:1.7;color:#cbd5e1}
+.tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:18px 0}select,button{font:inherit;padding:10px 14px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff}
+button{cursor:pointer}button.primary{background:#0f766e}canvas{width:100%;height:auto;display:block;touch-action:none;cursor:crosshair;background:#000;border:1px solid #475569}
+pre{white-space:pre-wrap;background:#1e293b;padding:16px;border-radius:8px}#status{min-height:24px;color:#fcd34d}
+</style>
+<main>
+<h1>截图坐标校准</h1>
+<p>先选字段，再在截图上拖动框选。商店名称区域只框名称；商店羁绊区域可单独框选，用于区分拉克丝形态。保留分辨率和界面缩放后，坐标才适用。</p>
+<div class="tools"><select id="field" aria-label="识别字段"></select><button id="clear">清除可选羁绊区域</button><button id="export" class="primary">导出 layout.json</button><span id="dimensions"></span></div>
+<div id="status" role="status"></div><canvas id="canvas" aria-label="拖动框选识别区域"></canvas>
+<p>将导出的文件放到项目 config/layout.json；配置文件中的 width、height 也要按截图尺寸修改。此页面不会连接游戏或发送操作。</p>
+<pre id="preview"></pre>
+</main>
+<script id="payload" type="application/json">__CALIBRATION_DATA__</script>
+<script>
+const data=JSON.parse(document.getElementById('payload').textContent);
+const layout=structuredClone(data.layout), fields=[['coin','金币'],['level','等级'],['period','回合']];
+layout.store_details ??= Array(5).fill(null);
+for(let i=0;i<5;i++)fields.push([`store.${i}`,`商店 ${i+1}：名称`]);
+for(let i=0;i<5;i++)fields.push([`store_details.${i}`,`商店 ${i+1}：羁绊（可选）`]);
+const select=document.getElementById('field'), canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d'), status=document.getElementById('status');
+for(const [key,label] of fields){const o=document.createElement('option');o.value=key;o.textContent=label;select.append(o)}
+canvas.width=data.width;canvas.height=data.height;
+document.getElementById('dimensions').textContent=`截图：${data.width} × ${data.height}`;
+const img=new Image();img.src='data:image/png;base64,__SCREENSHOT_DATA__';img.onload=draw;
+let start=null;
+function get(key){const [a,b]=key.split('.');return b===undefined?layout[a]:layout[a][Number(b)]}
+function set(key,value){const [a,b]=key.split('.');if(b===undefined)layout[a]=value;else layout[a][Number(b)]=value}
+function valid(r){return Array.isArray(r)&&r.length===4&&r.every(Number.isInteger)&&r[0]>=0&&r[1]>=0&&r[2]>0&&r[3]>0&&r[0]+r[2]<=data.width&&r[1]+r[3]<=data.height}
+function draw(){ctx.drawImage(img,0,0);ctx.lineWidth=Math.max(2,data.width/500);ctx.font=`${Math.max(12,data.width/75)}px sans-serif`;for(const [key,label] of fields){const r=get(key);if(!r)continue;ctx.strokeStyle=key===select.value?'#facc15':'#2dd4bf';ctx.fillStyle=ctx.strokeStyle;ctx.strokeRect(...r);ctx.fillText(label,r[0],Math.max(18,r[1]-5))}document.getElementById('preview').textContent=JSON.stringify(layout,null,2)}
+function point(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(data.width,Math.round((e.clientX-r.left)*data.width/r.width))),Math.max(0,Math.min(data.height,Math.round((e.clientY-r.top)*data.height/r.height)))]}
+function rectangle(end){return [Math.min(start[0],end[0]),Math.min(start[1],end[1]),Math.abs(end[0]-start[0]),Math.abs(end[1]-start[1])]}
+canvas.addEventListener('pointerdown',e=>{start=point(e);canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!start)return;draw();ctx.strokeStyle='#facc15';ctx.strokeRect(...rectangle(point(e)))});
+canvas.addEventListener('pointerup',e=>{if(!start)return;const r=rectangle(point(e));start=null;if(valid(r)){set(select.value,r);status.textContent='区域已更新。'}else status.textContent='区域宽高必须大于 0。';draw()});
+canvas.addEventListener('pointercancel',()=>{start=null;draw()});
+select.addEventListener('change',draw);
+document.getElementById('clear').onclick=()=>{if(!select.value.startsWith('store_details.')){status.textContent='名称、金币、等级和回合是必需区域。';return}set(select.value,null);draw()};
+document.getElementById('export').onclick=()=>{for(const [key,label] of fields){const r=get(key);if(r===null&&key.startsWith('store_details.'))continue;if(!valid(r)){status.textContent=`请先校准：${label}（区域缺失或超出截图）。`;return}}const url=URL.createObjectURL(new Blob([JSON.stringify(layout,null,2)+'\n'],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='layout.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent='已导出。请同步修改配置分辨率，再用 observe 核对识别结果。'};
+</script>
+</html>

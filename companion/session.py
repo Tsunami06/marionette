@@ -44,7 +44,7 @@ class Session:
         async with self.lock:
             return await self._observe()
 
-    async def buy(self, slot, execute=False, expected_name=None):
+    async def buy(self, slot, execute=False, expected_name=None, expected_id=None):
         async with self.lock:
             before = None
             try:
@@ -62,8 +62,14 @@ class Session:
                     reason = "incomplete_observation"
                 elif before.store[slot] is None or before.store[slot].price is None:
                     reason = "unknown_card_or_price"
+                elif before.store[slot].kind != "champion":
+                    reason = "unsupported_shop_type"
+                elif before.store[slot].identity_status != "resolved":
+                    reason = "ambiguous_champion_identity"
                 elif expected_name and before.store[slot].name != expected_name:
                     reason = "shop_changed"
+                elif expected_id and before.store[slot].entity_id != expected_id:
+                    reason = "shop_identity_changed"
                 elif before.coin - before.store[slot].price < self.settings.reserve_gold:
                     reason = "gold_reserve"
                 elif self.actions >= self.settings.max_actions:
@@ -121,8 +127,9 @@ class Session:
                     break
                 if snapshot.phase == "preparation":
                     for slot, card in enumerate(snapshot.store):
-                        if card and card.name in self.settings.targets:
-                            result = await self.buy(slot, execute, expected_name=card.name)
+                        if card and card.kind == "champion" and card.name in self.settings.targets:
+                            result = await self.buy(slot, execute, expected_name=card.name,
+                                                    expected_id=card.entity_id)
                             if result.status in ("verified", "paused"):
                                 break
                 iterations += 1

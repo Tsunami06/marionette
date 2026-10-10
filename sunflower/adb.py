@@ -7,7 +7,6 @@ import random
 import re
 from loguru import logger
 from numpy import ndarray
-from paddleocr import PaddleOCR
 from dataclasses import dataclass
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.adb_device_async import AdbDeviceTcpAsync
@@ -39,7 +38,8 @@ class AdbOCR:
         self.ocr_engine = None
         self._random = random.Random()
 
-    async def load(self, port: int, host: str = "localhost", scan_if_fail=True, language: str = 'ch') -> None:
+    async def load(self, port: int, host: str = "localhost", scan_if_fail=True,
+                   language: str = 'ch', initialize_ocr: bool = True) -> None:
         """
         Load the ADB connection.
 
@@ -50,11 +50,9 @@ class AdbOCR:
             language: The language to use for the OCR engine.
         Returns:
         """
-        task1 = asyncio.create_task(self._init_ocr_engine(language=language))
-        task2 = asyncio.create_task(self._connect_device(port=port, host=host, scan_if_fail=scan_if_fail))
-
-        await task1
-        await task2
+        await self._connect_device(port=port, host=host, scan_if_fail=scan_if_fail)
+        if self.is_connected() and initialize_ocr:
+            await self._init_ocr_engine(language=language)
 
     async def _connect_device(
             self,
@@ -137,6 +135,7 @@ class AdbOCR:
 
         Returns:
         """
+        from paddleocr import PaddleOCR
         self.ocr_engine = await asyncio.to_thread(
             PaddleOCR, lang=language, show_log=False, use_gpu=False)
 
@@ -220,7 +219,7 @@ class AdbOCR:
         """
         image_bytes_str = await self._device.exec_out("screencap -p", decode=False)
         raw_image = numpy.frombuffer(image_bytes_str, dtype=numpy.uint8)
-        return cv2.imdecode(raw_image, cv2.IMREAD_GRAYSCALE)
+        return cv2.imdecode(raw_image, cv2.IMREAD_COLOR)
 
     async def click(self, x: int, y: int) -> None:
         """
