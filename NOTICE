@@ -1,0 +1,11 @@
+This project is derived from Carey8175/Sunflower:
+https://github.com/Carey8175/Sunflower
+Upstream baseline: c4d6b3bc7dce2108dc79c01e57e71c740ae9fa71
+Upstream copyright: Copyright (c) 2024 Wang Wenjie
+The upstream MIT license is preserved in LICENSE.
+
+The companion package, CLI, configuration, tests and fixes are additions.
+Legacy sf_tests scripts are manual examples, not automated tests; some send
+real game input (including selling units). Do not run them as a test suite.
+Bundled game data and image templates are inherited reference material;
+they are not a verified dataset for the current game version.

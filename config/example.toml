@@ -1,0 +1,18 @@
+# Paths are relative to this configuration file.
+host = "localhost"
+port = 16384
+width = 1024
+height = 720
+dpi = 240
+layout = "layout.json"
+heroes = "../sunflower/statics/heroes.json"
+logs = "../runs"
+
+# Upstream data is from 2024. Keep false until replaced and checked against your game.
+current_data_verified = false
+targets = []
+reserve_gold = 20
+max_actions = 1
+poll_seconds = 2.0
+action_delay = 0.5
+max_observation_age = 3.0
